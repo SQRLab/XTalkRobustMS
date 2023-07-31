@@ -281,3 +281,42 @@ def animateRadialMode(N, m, masses=None, disp_size=1/3, freq = 2*π/25):
     
     return HTML(anim.to_jshtml())
 
+def visualizeAxialMode(N, m, masses=None,disp_size=1/3.):
+    
+    fig,ax = plt.subplots(1,1)
+    if masses == None:
+        masses = [1]*N
+        
+    eqpos = calcPositions(N)
+    modevec = calcAxialModes(N,masses=masses)[m][1]
+    
+    for i in range(N):
+        ax.plot(eqpos[i],0,'.b',markersize=20*masses[i]**(1/2))
+        ax.arrow(eqpos[i],0,-modevec[i],0,length_includes_head=True,head_width=0.005, head_length=0.1,shape="full", color='k')
+    
+    ax.set_xlim(min(eqpos*1.5),max(eqpos*1.5))
+    
+    plt.axis('off')
+    plt.show()
+
+
+def visualizeRadialMode(N, m, masses=None,disp_size=0.1):
+    
+    fig,ax = plt.subplots(1,1)
+    if masses == None:
+        masses = [1]*N
+        
+    eqpos = calcPositions(N)
+    modevec = calcAxialModes(N,masses=masses)[m][1]
+    
+    for i in range(N):
+        ax.plot(eqpos[i],0,'.b',markersize=20*masses[i]**(1/2))
+        ax.arrow(eqpos[i],0,0,modevec[i]*disp_size,width=disp_size*0.25,length_includes_head=True,head_width=disp_size, head_length=disp_size*0.1,shape="full", color='k')
+    
+    ax.set_xlim(min(eqpos*1.5),max(eqpos*1.5))
+    ax.set_ylim(-0.1,0.1)
+    
+    plt.axis('off')
+    plt.show()
+    
+
