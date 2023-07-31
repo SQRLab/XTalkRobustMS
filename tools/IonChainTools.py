@@ -8,15 +8,11 @@ Provides functions for:
 import numpy as np
 from scipy.optimize import fsolve, leastsq
 from math import exp, pi as π
-
-# Physical Constants
-physconsts = {
-    "c" : 299792458, # speed of light, units of m/s
-    "ϵ0" : 8.854188e-12, # permittivity of free space, units of F/m
-    "amu" : 1.66054e-27, # atomic mass unit, units of kg
-    "q_e" : 1.60218e-19 # electron charge, units of C
-}
-physconsts["mass_Ca40"] = 39.9626*physconsts["amu"] # mass of calcium atom, units of kg
+import scipy.constants as con
+import matplotlib.pyplot as plt
+from matplotlib import animation, rc
+from IPython.display import HTML
+from math import sin, pi as π
 
 def ion_position_potential(x):
     '''Potential energy of the ion string as a function of the positions of the ions
@@ -63,9 +59,9 @@ def lengthScale(ν, M=None, Z=None):
         float
         length scale in units of meters
     '''
-    if M==None: M = physconsts["mass_Ca40"]
+    if M==None: M = con.atomic_mass*39.9626
     if Z==None: Z = 1
-    return ((Z**2*physconsts["q_e"]**2)/(4*π*physconsts['ϵ0']*M*ν**2))**(1/3)
+    return ((Z**2*con.elementary_charge**2)/(4*π*con.epsilon_0*M*ν**2))**(1/3)
 
 def calcAxialModes(N, masses=None):
     '''Calculate axial vibrational modes
@@ -178,3 +174,110 @@ def calcCrosstalkIntensitiesAtPositions(beamcenters, bw, positions):
     intensities = sum([np.array([exp(-((p-c)/bw)**2) for p in positions]) for c in beamcenters])**2
     #intensities = sum([np.array([exp(-2*((p-c)/bw)**2) for p in positions]) for c in beamcenters])
     return intensities
+
+
+## Plotting
+
+def plotPositionsAndCrosstalk(N, targets, bw):
+    positions = calcPositions(N)
+    beamcenters = [positions[t] for t in targets]
+    intensities = calcCrosstalkIntensitiesAtPositions(beamcenters, bw, np.linspace(positions[0]-1, positions[-1]+1, 1000))
+    gradient = intensities.reshape(1, -1)
+   
+    mappable = plt.imshow(gradient, extent=[positions[0]-1, positions[-1]+1, -1, 1], aspect=0.5, cmap='Reds')
+    plt.scatter(positions, np.zeros(N))
+    plt.colorbar(mappable,orientation='horizontal')#, location='bottom', orientation='horizontal')
+    plt.xlabel("Position (units of length scale)")
+    plt.tick_params(left = False, labelleft = False)
+
+def animateAxialMode(N, m, masses=None, disp_size=1/3, freq = 2*π/25):
+    '''Make an animation of an ion chain moving in a particular axial mode
+    
+    Params
+        N : int
+            number of ions in chain
+        m : int
+            index of vibrational mode (0 is lowest mode)
+        masses : list (optional)
+            masses of ions, in arbitrary units
+        disp_size : float
+            size of maximum displacement of ions from equilibrium position, in units of the length scale
+        freq : float
+            how fast to make the animation, in units of radians/frame
+    '''
+    fig, ax = plt.subplots()
+
+    ax.set_xlim(( -5, 5))
+    ax.set_ylim((-5, 5))
+    ax.set_aspect('equal')
+
+    if masses == None:
+        masses = [1]*N
+    eqpos = calcPositions(N)
+    modevec = calcAxialModes(N, masses=masses)[m][1]
+
+    ions = [plt.Circle((0, 0), 0.2*masses[i]**(1/2)) for i in range(N)]
+
+    def init():
+        for i, ion in enumerate(ions):
+            ion.center = (eqpos[i], 0)
+            ax.add_patch(ion)
+        ax.scatter(eqpos, np.zeros(N), c="red", s=0.05)
+        return ions
+
+    def animate(t):
+        for i, ion in enumerate(ions):
+            ion.center = (eqpos[i]+sin(freq*t)*modevec[i]*disp_size, 0)
+        return ions
+    
+    anim=animation.FuncAnimation(fig,animate,init_func=init,frames=round(2*π/freq), blit=True)
+    plt.close()
+    
+    return HTML(anim.to_jshtml())
+
+
+def animateRadialMode(N, m, masses=None, disp_size=1/3, freq = 2*π/25):
+    '''Make an animation of an ion chain moving in a particular axial mode
+    
+    Params
+        N : int
+            number of ions in chain
+        m : int
+            index of vibrational mode (0 is lowest mode)
+        masses : list (optional)
+            masses of ions, in arbitrary units
+        disp_size : float
+            size of maximum displacement of ions from equilibrium position, in units of the length scale
+        freq : float
+            how fast to make the animation, in units of radians/frame
+    '''
+    fig, ax = plt.subplots()
+
+    ax.set_xlim(( -5, 5))
+    ax.set_ylim((-5, 5))
+    ax.set_aspect('equal')
+
+    if masses == None:
+        masses = [1]*N
+    eqpos = calcPositions(N)
+    modevec = calcRadialModes(N, masses=masses,νratio = 10)[m][1]
+
+    ions = [plt.Circle((0, 0), 0.2*masses[i]**(1/2)) for i in range(N)]
+
+    def init():
+        for i, ion in enumerate(ions):
+            ion.center = (eqpos[i], 0)
+            ax.add_patch(ion)
+        ax.scatter(eqpos, np.zeros(N), c="red", s=0.05)
+        return ions
+
+    def animate(t):
+        for i, ion in enumerate(ions):
+            ion.center = (eqpos[i],sin(freq*t)*modevec[i]*disp_size)
+        return ions
+    
+    anim=animation.FuncAnimation(fig,animate,init_func=init,frames=round(2*π/freq), blit=True)
+    plt.close()
+    
+    return HTML(anim.to_jshtml())
+
