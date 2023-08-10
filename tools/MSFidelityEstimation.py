@@ -101,7 +101,7 @@ def estimateMSFidelity_errgate_exactTN(N, m, targets, bw=1, mode_type="axial", m
     return fid
 
 
-def estimateMSFidelity_errgate_allnearpairs(N, m, targets, bw, mvec=None, mode_type="axial", intensities=None, ψ0=None, moreneigh=False, νratio=None):
+def estimateMSFidelity_errgate_allnearpairs(N, m, targets, bw=1, mvec=None, mode_type="axial", intensities=None, ψ0=None, moreneigh=False, νratio=None):
     '''
     Estimates error in 2-ion MS gate using error gate model. Simulates all error gates (including between pairs of
     neighbors), for either nearest neighbors or for next-nearest neighbors as well.
