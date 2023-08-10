@@ -8,8 +8,10 @@ from itertools import combinations
 from operator import mul, add
 from functools import reduce
 from qutip import sigmax, tensor, basis, fidelity, qeye
-
-import tools.IonChainTools as ict
+import sys, os
+file_dir = os.path.dirname(__file__)
+sys.path.append(file_dir)
+import IonChainTools as ict
 
 π = np.pi
 pi = np.pi
