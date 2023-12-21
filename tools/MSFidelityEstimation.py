@@ -199,18 +199,10 @@ def parityCurve(ρ, numpoints=100):
 ###############################################################################
 
 
-def MS_ideal(N, targets, m, modetype):
-    pass
-    
-
 def MS_Analytical_zeroinitalstate_tracemodes(opspec, simmodes=None, modetype='radial', modetrunc=2):
-    '''
-    Calculate
-    
-    '''
-    devspec = opspec.devicespec
-    N = devspec.N
-    t = opspec.duration
+    devicespec = opspec.devicespec
+    N = devicespec.N
+    τ = opspec.duration
     Ωvals = opspec.mslaserspec.Ωvals
     ωd = opspec.mslaserspec.ωd
     if opspec.modetype==None: modetype = modetype
@@ -222,55 +214,54 @@ def MS_Analytical_zeroinitalstate_tracemodes(opspec, simmodes=None, modetype='ra
     
     if simmodes == None:
         simmodes = list(range(N))
+
+    illuminated = [i for i in range(N) if Ωvals[i] != 0] # All illuminated ions
+    Ωvals_nonzero = [Ωvals[i] for i in illuminated]
+    Neff = len(illuminated) # We only need to work on subspace of illuminated qubits, dimension of effective N
+
+    # Effect of M1 term
+    α_kλ = np.zeros((len(simmodes),2**Neff), dtype=np.cdouble) # Mode displacements in each mode k for each qubit state λ, comes from M1 term
+    for keff, k in enumerate(simmodes):
+        δk = ωd - devicespec.modes(modetype)[k].freq
+        α_i = np.zeros(Neff, np.cdouble)
+        for ieff, i in enumerate(illuminated):
+            α_i[ieff] = Ωvals[i]*devicespec.LDparam(k,modetype,i)/(2*δk)*(exp(-1j*δk*τ)-1) # Leave out exp(iϕm) since we trace out modes anyway
+        for l, λ in enumerate(itertools.product(*([[-1,+1]]*Neff))):
+            α_kλ[keff,l] += np.sum(α_i*λ)
+
+    # Effect of M2 term
+    θλ = np.zeros(2**Neff) # Angle of phase placed on each qubit state λ, comes from M2 term
+    θ_j1j2 = np.zeros((Neff, Neff))
+    for keff, k in enumerate(simmodes):
+        δk = ωd - devicespec.modes(modetype)[k].freq
+        for (j1eff, j1), (j2eff, j2) in itertools.combinations(enumerate(illuminated),2):
+            modekcontrib = -1/4*Ωvals[j1]*Ωvals[j2]*devicespec.LDparam(k,modetype,j1)*devicespec.LDparam(k,modetype,j2)
+            modekcontrib *= (τ/δk - sin(δk*τ)/δk**2)
+            θ_j1j2[j1eff,j2eff] += modekcontrib
+    for l, λ in enumerate(itertools.product(*([[-1,+1]]*Neff))):
+        for j1eff, j2eff in itertools.combinations(range(Neff),2):
+            θλ[l] += λ[j1eff]*λ[j2eff]*θ_j1j2[j1eff,j2eff] * (2 if j1eff!=j2eff else 1)
     
-    ρqbit_mat = np.zeros((2**N,2**N), dtype=np.cdouble)
+    # Creating qubit density matrix (only illuminated qubits)
+    ρqbit_mat = np.ones((2**Neff,2**Neff), dtype=np.cdouble)/2**Neff # Rotation basis
+    for l1, l2 in itertools.product(range(2**Neff), range(2**Neff)):
+        ρqbit_mat[l1, l2] *= exp(1j*(θλ[l1]-θλ[l2])) # Rotation phase
+        mode_trace_factor = 1
+        for keff, k in enumerate(simmodes):
+            αl1 = α_kλ[keff,l1]
+            αl2 = α_kλ[keff,l2]
+            mode_trace_factor *= exp(-1/2*(abs(αl1)**2+abs(αl2)**2-2*αl2.conjugate()*αl1))
+        ρqbit_mat[l1, l2] *= mode_trace_factor
     
-    naturalbasis = list(itertools.product(*[[-1,+1]]*N))
-    innerprod = 0
-    for λ1,λ2 in itertools.product(naturalbasis, naturalbasis):
-        # λ is a N-element list, representing a qubit state in the X basis (-1=|0>, +1=|1>).
-        # We assume all λ values have equal initial coefficients
-        # which corresponds to all |0> initial state in Z basis.
-        λ1λ2coeff = 0
-        for γ in list(itertools.product(*[list(range(modetrunc))]*len(simmodes))):
-            # γ is a list of N integers, representing a mode state in the number basis
-            # Used because we're tracing over all mode states
-            displacementproduct = 1/2**(N) # From \lamba
-            for k in simmodes:
-                νk = devspec.modes(modetype)[k].freq
-                time_dependence = (exp(-1j*(ωd-νk)*t)-1)/(2*(ωd-νk))
-                laserphase = exp(1j*ϕm)
-                αλ1k = np.sum([Ωvals[i]*devspec.LDparam(k, modetype, i)*λ1[i] for i in range(N)])*time_dependence*laserphase
-                αλ2k = np.sum([Ωvals[i]*devspec.LDparam(k, modetype, i)*λ2[i] for i in range(N)])*time_dependence*laserphase
-                displacementproduct *= coherent_coeff(αλ1k, γ[simmodes.index(k)])
-                displacementproduct *= coherent_coeff(αλ2k, γ[simmodes.index(k)]).conjugate()
-            λ1λ2coeff += displacementproduct
-        phaseproduct = 1
-        for a, λ in enumerate((λ1, λ2)):
-            phaseangle = 0
-            for k in simmodes:
-                for j1, j2 in itertools.product(range(N),range(N)):
-                    ηkj1 = devspec.LDparam(k, modetype, j1)
-                    ηkj2 = devspec.LDparam(k, modetype, j2)
-                    νk = devspec.modes(modetype)[k].freq
-                    phaseangle += Ωvals[j1]*Ωvals[j2]*ηkj1*ηkj2*(t/(ωd-νk)-sin((ωd-νk)*t)/(ωd-νk)**2)*λ[j1]*λ[j2]
-            phase = exp(-1j/4*phaseangle)
-            if a == 1:
-                phase = phase.conjugate()
-            phaseproduct *= phase
-        λ1λ2coeff *= phaseproduct
-        λ1_index = int("".join(['0' if λ1[i]==-1 else '1' for i in range(N)]),2)
-        λ2_index = int("".join(['0' if λ2[i]==-1 else '1' for i in range(N)]),2)
-        ρqbit_mat[λ1_index, λ2_index] = λ1λ2coeff
-        
-    ρqbit = qtp.Qobj(ρqbit_mat, dims=[[2]*N,[2]*N])
+    ρqbit = qtp.Qobj(ρqbit_mat, dims=[[2]*Neff,[2]*Neff])
     
     σeigstates = σ(π/2+ϕs).eigenstates()
     σbasis = qtp.Qobj(np.c_[σeigstates[1][0].data.A, σeigstates[1][1].data.A],dims=[[2],[2]])
-    change_of_basis = qtp.tensor([σbasis]*N)
+    change_of_basis = qtp.tensor([σbasis]*Neff)
     ρqbit_zbasis = change_of_basis*ρqbit*change_of_basis.dag()
     
     return ρqbit_zbasis
+    
 
 # ###############################################################################
 # # MS Fidelity Calculation Methods **OLD VERSIONS**
