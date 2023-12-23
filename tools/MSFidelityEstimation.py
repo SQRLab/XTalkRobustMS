@@ -260,7 +260,7 @@ def MS_Analytical_zeroinitalstate_tracemodes(opspec, simmodes=None, modetype='ra
     change_of_basis = qtp.tensor([σbasis]*Neff)
     ρqbit_zbasis = change_of_basis*ρqbit*change_of_basis.dag()
     
-    return ρqbit_zbasis
+    return ρqbit_zbasis, illuminated
     
 
 # ###############################################################################

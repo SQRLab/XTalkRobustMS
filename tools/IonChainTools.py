@@ -316,5 +316,63 @@ def visualizeRadialMode(N, m, ax, masses=None,disp_size=0.1,ion_size=20,head_siz
     ax.set_ylim(-0.1,0.1)
     
     return ax
-    
 
+def axialfreq_from_minimum_spacing(N, M, minspacing):
+    '''Calculate the axial frequency necessary to achieve a particular minimum value for inter-ion spacing.
+
+    Params
+        N (integer): Number of ions in the string
+        M (float): Mass of ion species, in kilograms
+        minspacing (float): Minimum spacing between ions, in meters
+
+    Returns
+        (float): Axial frequency such that ions will have given minimum spacing
+    '''
+    ionpositions_scaledunits = calcPositions(N)
+    minspacing_scaledunits = np.min([ionpositions_scaledunits[i+1]-ionpositions_scaledunits[i]  for i in range(N-1)])
+    desired_lengthscale = minspacing/minspacing_scaledunits
+    reference_lengthscale = lengthScale(2*π*1e6, M=M) # Lengthscale
+    necessary_axialfreq = (desired_lengthscale/reference_lengthscale)**(-3/2)*2*π*1e6
+    return necessary_axialfreq
+
+def trap_freq_ratio_for_stablility(N):
+    '''Calculate the minimum ratio between the radial and axial trap frequencies
+    necessary for a stable ion string. Value returned will be at most 0.001 more
+    than actual value.
+    
+    Params
+        N (int) : Length of string
+        
+    Returns
+        (float) Minimum ratio of (radial trap frequency)/(axial trap frequency) necessary for string stability
+    '''
+    approx_min_ratio = 0
+    for stepsize in (10,1,0.1,0.01,0.001):
+        for ratio in np.arange(approx_min_ratio, approx_min_ratio+11*stepsize, stepsize):
+            #print(N, ratio)
+            if len(calcRadialModes(N, νratio=ratio)) == N:
+                #print('over')
+                approx_min_ratio = ratio-stepsize
+                break
+    approx_min_ratio += 0.001
+    return approx_min_ratio
+
+
+def Ωvals_from_gaussian_crosstalk(N, targets, νz, M, beamradius):
+    '''Calculate rabi frequency values (proportional to electric field strength) present
+    the sites of the ions based on a gaussian beam profile.
+
+    Params
+        N (int) : Number of ions the string
+        targets (tuple) : Indices of ions on which laser beams are centered
+        νz (float) : Axial trap frequency (radian Hz) 
+        M (float) : Mass of ion species (kg)
+        beamradius (float) : Distance from beam center at which electric field intensity goes down by 1/e
+
+    Returns
+        (numpy array) N rabi frequency values, scaled so the center of a single beam corresponds to 1
+    '''
+    positions = calcPositions(N)*lengthScale(νz, M=M)
+    gaussian = lambda d : exp(-(d/beamradius)**2)
+    Ωvals = [sum(gaussian(positions[t]-positions[i]) for t in targets if gaussian(positions[t]-positions[i])>0.01) for i in range(N)]
+    return np.array(Ωvals)
