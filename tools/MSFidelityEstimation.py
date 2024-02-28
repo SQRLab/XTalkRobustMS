@@ -91,7 +91,7 @@ class MSLaserSpec:
         
         
 class TIDeviceSpec:
-    def __init__(self, N, trapspec, ωqbit, ωraman, M=1):
+    def __init__(self, N, trapspec, ωqbit, ωraman=0, M=1):
         self.N = N
         self.trapspec = trapspec
         self.ωqbit = ωqbit
@@ -114,7 +114,10 @@ class TIDeviceSpec:
     def LDparam(self, m, modetype, i):
         νm = self.modes(modetype)[m].freq
         z0 = np.sqrt(scipy.constants.hbar/(2*self.M*νm))
-        k = (2*self.ωraman+self.ωqbit)/scipy.constants.c
+        if self.ωraman != 0:
+            k = (2*self.ωraman+self.ωqbit)/scipy.constants.c
+        else:
+            k = self.ωqbit/scipy.constants.c
         bmi = self.modes(modetype)[m].mvec[i] # Coupling of ion i to mode m, usually denoted $b^m_i$
         return k*z0*bmi
     
