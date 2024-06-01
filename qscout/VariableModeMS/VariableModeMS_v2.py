@@ -11,7 +11,7 @@ from qscout.v1.QSCOUTBuiltins import QSCOUTBuiltins, GLOBAL_BEAM, both_tones
 class VariableModeMS(QSCOUTBuiltins, HelperFunctions):
     # This class inherits both QSCOUTBuiltins and HelperFunctions
 
-    def gate_VariableModeMS(self, channel1, channel2, mode, global_duration=-1e6):
+    def gate_VariableModeMS(self, channel1, channel2, mode, detuning, duration):
         """VariableModeMS: Generate a Mølmer-Sørensen gate to entangle ions on
             channel1 and channel2 using the specified mode. This code currently
             generates a square pulse on both the global beam and the individual
